@@ -24,12 +24,13 @@ var intialPath = './js/gmail-app';
 var ResultMap = {
     depsWithJsExtension: [], //array of [filename, requireUsed]
     dupDeps: [],
-
 };
+
+var aliasMap = {}; //alias to full path
 
 
 //get a list of all available js file
-function listDir(dir, res) {
+function scanFile(dir, res) {
     var dirs = fs.readdirSync(dir);
     var res = res || {};
 
@@ -38,24 +39,60 @@ function listDir(dir, res) {
         var newDir = './' + path.join(dir, dirs[i]);
 
         if (fs.lstatSync(newDir).isDirectory()) {
-            listDir(newDir, res);
+            scanFile(newDir, res);
         } else {
             var extension = path.extname(newDir);
 
             if (extension === '.js' && newDir.indexOf('spec.js') === -1) {
-                res[newDir] = {
-                    fullPath: newDir,
-                    myAlias: getAliasPath(newDir),
-                    dependOn: getDeps(newDir)
+                res[_trimJsExtension(newDir)] = {
+                    fullPath: path.join(__dirname, newDir),
+                    shortPath: _trimJsExtension(newDir),
+                    myAlias: _.reduce(getAliasPath(newDir), function(r, v) {
+                        var shortV = _trimJsExtension(v);
+                        r[shortV] = true; //convert it to a map for easier look up
+                        aliasMap[shortV] = _trimJsExtension(newDir);
+                        return r
+                    }, {}),
+                    dependOn: _.reduce(getDeps(newDir), function(r, v) {
+                        r.push(_trimJsExtension(v));
+                        return r;
+                    }, []),
                 };
             }
         }
     }
 }
 
+//detect cycle
+function scanCycle(res, cycleMap) {
+    cycleMap = cycleMap || {};
+
+    var pathKeys = []; //list of file1, file2,etc
+    var pathKeyIndexMap = {}; //reverse map file1 -> index in the array
+    _.each(res, function(v, k) {
+        pathKeyIndexMap[k] = pathKeys.length;
+        pathKeys.push(k);
+    });
+
+    var cycleMat = []; //cycle matrix
+    for (var i = 0; i < pathKeys.length; i++) {
+        cycleMat.push(_.times(cycleMat.length, _.constant(0)));
+    }
+
+
+    //put the value in for the cycle
+    _.each(res, function(v, dir) {
+        _.each(v.dependOn, function(dependOn) {
+            var resolvedDependOn = aliasMap[dependOn];
+            // console.log(dir, dependOn, resolvedDependOn)
+        });
+    });
+
+    console.log(res);
+}
+
 //look at the content of the file and extract all requires
-//
-function getDeps(newDir, content) {
+function getDeps(newDir) {
     var content = fs.readFileSync(newDir, 'utf8'); //read the content of the file.
     var deps;
     var requiresMatches = content.match(/require\([^)]+\)/g) || [];
@@ -67,7 +104,7 @@ function getDeps(newDir, content) {
                 ResultMap.depsWithJsExtension.push([newDir, shortenedRequirePath]);
 
                 //remove the .js
-                shortenedRequirePath = shortenedRequirePath.substr(0, shortenedRequirePath.length - 3);
+                shortenedRequirePath = _trimJsExtension(shortenedRequirePath);
             }
 
             return shortenedRequirePath;
@@ -91,6 +128,14 @@ function getDeps(newDir, content) {
 
 
     return requiresMatches;
+}
+
+function _trimJsExtension(fileName) {
+    if (fileName.indexOf('.js') >= 0) {
+        return fileName.substr(0, fileName.length - 3);
+    }
+
+    return fileName
 }
 
 
@@ -138,13 +183,17 @@ function printSectionDivder() {
 }
 
 var res = {};
-listDir(intialPath, res);
-
-console.log('WARNING: REQUIRES CONTAINING .JS');
-printResultRow(ResultMap.depsWithJsExtension, ['File', 'Requires']);
+scanFile(intialPath, res);
 
 
-printSectionDivder();
-console.log('WARNING: DUPLICATE REQUIRES');
-printResultRow(ResultMap.dupDeps, ['File', 'Requires', 'Count']);
+var cycleMap = {};
+scanCycle(res, cycleMap);
+
+// console.log('WARNING: REQUIRES CONTAINING .JS');
+// printResultRow(ResultMap.depsWithJsExtension, ['File', 'Requires']);
+
+
+// printSectionDivder();
+// console.log('WARNING: DUPLICATE REQUIRES');
+// printResultRow(ResultMap.dupDeps, ['File', 'Requires', 'Count']);
 // console.log(res);
