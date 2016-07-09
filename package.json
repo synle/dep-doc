@@ -1,0 +1,23 @@
+{
+  "name": "dep-doc",
+  "version": "1.0.0",
+  "description": "Check your dependencies for circular dependencies and duplicate deps.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/synle/dep-doc.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/synle/dep-doc/issues"
+  },
+  "homepage": "https://github.com/synle/dep-doc#readme",
+  "dependencies": {
+    "console.table": "^0.7.0",
+    "lodash": "^4.13.1"
+  }
+}
